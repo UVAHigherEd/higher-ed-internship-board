@@ -105,7 +105,7 @@
   /* Work-study distinct color badges */
   .fact.ws-required{background:#fce9d8;color:#8a4a00;border:1px solid #f6d1b1;}
   .fact.ws-pref{background:#e5eff7;color:#1d486e;border:1px solid #c9dfef;}
-  .fact.ws-not-required{background:#efeee9;color:#5b6180;border:1px solid #e0ded6;}
+  .fact.ws-not-considered{background:#efeee9;color:#5b6180;border:1px solid #e0ded6;}
 
   .chevron{
     font-size:1.1rem;color:var(--ink-soft);transition:transform .18s ease;
@@ -220,7 +220,7 @@ function wsBucket(ws){
   if (!ws) return "Not specified";
   if (ws.includes("Required") || ws.startsWith("Yes")) return "Required";
   if (ws.includes("Preference") || ws.includes("Preferred")) return "Preferred";
-  if (ws.includes("not a factor") || ws.includes("Not required")) return "Not required";
+  if (ws.includes("not a factor") || ws.includes("Not required") || ws.includes("Not considered")) return "Not considered";
   return ws;
 }
 
@@ -228,14 +228,14 @@ function wsClass(ws){
   const b = wsBucket(ws);
   if (b === "Required") return "ws-required";
   if (b === "Preferred") return "ws-pref";
-  if (b === "Not required") return "ws-not-required";
+  if (b === "Not considered") return "ws-not-considered";
   return "";
 }
 
 // Defined clean options for all filters
 const locations = ["All", "In-person", "Hybrid", "Remote"];
 const hoursOpts = ["All", "10-15 hours / week", "16-20 hours / week", "21+ hours / week"];
-const wsOpts = ["All", "Required", "Preferred", "Not required"];
+const wsOpts = ["All", "Required", "Preferred", "Not considered"];
 const weekendOpts = ["All", "No", "Occasionally", "Yes, regularly"];
 
 function buildChips(containerId, options, key, orange){
@@ -301,7 +301,6 @@ function render(){
     `;
     head.onclick = ()=>{ card.classList.toggle("open"); };
 
-    // Avoid displaying location detail if it merely repeats the quickfact
     const showLocDetail = p.location_detail && 
       p.location_detail.trim().toLowerCase() !== (p.location || "").trim().toLowerCase();
 
