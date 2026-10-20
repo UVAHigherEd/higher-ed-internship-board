@@ -186,45 +186,57 @@ const positions = [{"code":"CAR-01","office":"UVA Career Center Pre-Health Advis
 
 const state = { search: "", location: "All", hours: "All", ws: "All", weekend: "All" };
 
-function hoursSortValue(str){
-  const m = str.match(/\d+/);
-  return m ? parseInt(m[0], 10) : Infinity;
+// Normalizes work locations and handles variations
+function locBucket(loc) {
+  if (!loc) return "Not specified";
+  const l = loc.toLowerCase();
+  if (l.includes("remote")) return "Remote";
+  if (l.includes("hybrid")) return "Hybrid";
+  if (l.includes("in-person")) return "In-person";
+  return loc.trim();
 }
 
-const weekendPriority = ["No, never", "No", "Occasionally", "Yes, regularly"];
-function weekendSortValue(str){
-  const i = weekendPriority.indexOf(str);
-  return i === -1 ? 999 : i;
+// Collapses whitespace and groups standard hour brackets
+function hoursBucket(h) {
+  if (!h || h.toLowerCase().includes("unspecified")) return "Not specified";
+  const clean = h.replace(/\s+/g, " ").trim();
+  if (clean.includes("10-15")) return "10-15 hours / week";
+  if (clean.includes("16-20") || clean.includes("17-20") || clean.includes("18-20")) return "16-20 hours / week";
+  if (clean.includes("21+")) return "21+ hours / week";
+  return clean;
+}
+
+// Merges "No" and "No, never"
+function weekendBucket(w) {
+  if (!w) return "Not specified";
+  const clean = w.trim();
+  if (clean === "No" || clean.startsWith("No,")) return "No";
+  if (clean.includes("Occasionally")) return "Occasionally";
+  if (clean.includes("regularly")) return "Yes, regularly";
+  return clean;
 }
 
 function wsBucket(ws){
-  if(!ws) return "Not specified";
-  if(ws.includes("Required") || ws.startsWith("Yes")) return "Required";
-  if(ws.includes("Preference") || ws.includes("Preferred")) return "Preferred";
-  if(ws.includes("not a factor") || ws.includes("Not required")) return "Not required";
+  if (!ws) return "Not specified";
+  if (ws.includes("Required") || ws.startsWith("Yes")) return "Required";
+  if (ws.includes("Preference") || ws.includes("Preferred")) return "Preferred";
+  if (ws.includes("not a factor") || ws.includes("Not required")) return "Not required";
   return ws;
 }
 
 function wsClass(ws){
   const b = wsBucket(ws);
-  if(b === "Required") return "ws-required";
-  if(b === "Preferred") return "ws-pref";
-  if(b === "Not required") return "ws-not-required";
+  if (b === "Required") return "ws-required";
+  if (b === "Preferred") return "ws-pref";
+  if (b === "Not required") return "ws-not-required";
   return "";
 }
 
-const locations = ["All", ...new Set(positions.map(p=>p.location).filter(Boolean))];
-const hoursOpts = ["All", ...new Set(positions.map(p=>p.hours).filter(Boolean))].sort((a,b)=>{
-  if(a==="All") return -1;
-  if(b==="All") return 1;
-  return hoursSortValue(a) - hoursSortValue(b);
-});
+// Defined clean options for all filters
+const locations = ["All", "In-person", "Hybrid", "Remote"];
+const hoursOpts = ["All", "10-15 hours / week", "16-20 hours / week", "21+ hours / week"];
 const wsOpts = ["All", "Required", "Preferred", "Not required"];
-const weekendOpts = ["All", ...new Set(positions.map(p=>p.weekend).filter(Boolean))].sort((a,b)=>{
-  if(a==="All") return -1;
-  if(b==="All") return 1;
-  return weekendSortValue(a) - weekendSortValue(b);
-});
+const weekendOpts = ["All", "No", "Occasionally", "Yes, regularly"];
 
 function buildChips(containerId, options, key, orange){
   const el = document.getElementById(containerId);
@@ -244,10 +256,10 @@ function matches(p){
     const hay = (p.title+" "+p.office+" "+p.description).toLowerCase();
     if(!hay.includes(s)) return false;
   }
-  if(state.location!=="All" && p.location!==state.location) return false;
-  if(state.hours!=="All" && p.hours!==state.hours) return false;
+  if(state.location!=="All" && locBucket(p.location)!==state.location) return false;
+  if(state.hours!=="All" && hoursBucket(p.hours)!==state.hours) return false;
   if(state.ws!=="All" && wsBucket(p.workstudy)!==state.ws) return false;
-  if(state.weekend!=="All" && p.weekend!==state.weekend) return false;
+  if(state.weekend!=="All" && weekendBucket(p.weekend)!==state.weekend) return false;
   return true;
 }
 
@@ -279,8 +291,8 @@ function render(){
         <div class="office">${p.office}</div>
         <div class="title">${p.title}</div>
         <div class="quickfacts">
-          ${p.location ? `<div class="fact">${p.location}</div>` : ""}
-          ${p.hours ? `<div class="fact">${p.hours}</div>` : ""}
+          ${p.location ? `<div class="fact">${locBucket(p.location)}</div>` : ""}
+          ${p.hours ? `<div class="fact">${hoursBucket(p.hours)}</div>` : ""}
           ${p.pay ? `<div class="fact">${p.pay}</div>` : ""}
           <div class="fact ${wsClass(p.workstudy)}">Work-study: ${wsBucket(p.workstudy)}</div>
         </div>
@@ -288,6 +300,10 @@ function render(){
       <div class="chevron">&#9662;</div>
     `;
     head.onclick = ()=>{ card.classList.toggle("open"); };
+
+    // Avoid displaying location detail if it merely repeats the quickfact
+    const showLocDetail = p.location_detail && 
+      p.location_detail.trim().toLowerCase() !== (p.location || "").trim().toLowerCase();
 
     const body = document.createElement("div");
     body.className = "card-body";
@@ -301,7 +317,7 @@ function render(){
 
         ${p.req_skills ? `<div class="section-label">Required Skills</div><p>${p.req_skills}</p>` : ""}
         ${p.pref_skills ? `<div class="section-label">Preferred Skills</div><p>${p.pref_skills}</p>` : ""}
-        ${p.location_detail ? `<div class="section-label">Location Detail</div><p>${p.location_detail}</p>` : ""}
+        ${showLocDetail ? `<div class="section-label">Location Detail</div><p>${p.location_detail}</p>` : ""}
 
         <div class="section-label">Appointment duration</div>
         <p>${p.length || "Not specified"}</p>
@@ -310,7 +326,7 @@ function render(){
         <p>${p.start_when || "Not specified"}</p>
 
         <div class="section-label">Evenings / weekends</div>
-        <p>${p.weekend || "Not specified"}</p>
+        <p>${weekendBucket(p.weekend) || "Not specified"}</p>
 
         ${p.other ? `<div class="section-label">Additional Notes</div><p>${p.other}</p>` : ""}
 
